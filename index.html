@@ -73,16 +73,23 @@
     // Start AR session when button is clicked
     function startARSession() {
       if (navigator.xr) {
-        // Check if the browser supports WebXR
-        if (navigator.xr.isSessionSupported('immersive-ar')) {
-          navigator.xr.requestSession('immersive-ar', {
-            requiredFeatures: ['hit-test', 'anchors']
-          }).then(onSessionStarted).catch((err) => {
-            console.log('Error starting AR session: ', err);
-          });
-        } else {
-          console.log("WebXR is not supported or immersive AR is not available.");
-        }
+        console.log('WebXR supported');
+
+        // Check if the browser supports immersive-ar session
+        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+          if (supported) {
+            navigator.xr.requestSession('immersive-ar', {
+              requiredFeatures: ['hit-test', 'anchors']
+            }).then(onSessionStarted).catch((err) => {
+              console.error('Error starting AR session: ', err);
+            });
+          } else {
+            console.log("Immersive AR not supported on this device.");
+          }
+        }).catch((err) => {
+          console.error("Error checking session support: ", err);
+        });
+
       } else {
         console.log("WebXR API is not supported in this browser.");
       }
@@ -114,14 +121,17 @@
 
       // Perform hit testing and update the phone model's position
       if (xrSession && hitTestSource) {
-        const results = xrSession.requestHitTestSource({ space: xrSession.viewerSpace });
-        if (results.length > 0) {
-          const hit = results[0];
-          const hitPose = hit.getPose(xrSession.localReferenceSpace);
-          if (hitPose) {
-            phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+        xrSession.requestHitTestSource({ space: xrSession.viewerSpace }).then((results) => {
+          if (results.length > 0) {
+            const hit = results[0];
+            const hitPose = hit.getPose(xrSession.localReferenceSpace);
+            if (hitPose) {
+              phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+            }
           }
-        }
+        }).catch((err) => {
+          console.error("Error during hit test: ", err);
+        });
       }
 
       // Rotate the phone model for animation
