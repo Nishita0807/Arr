@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebXR 3D Model on Phone Screen</title>
+  <title>WebXR AR 3D Model on Real-World Surface</title>
   <style>
     body, html {
       margin: 0;
       padding: 0;
       height: 100%;
       background-color: #f0f0f0;
+      overflow: hidden;
     }
     #container {
       width: 100%;
@@ -17,15 +18,14 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@webxr/webxr-polyfill@latest"></script> <!-- WebXR Polyfill for browsers -->
+  <script src="https://cdn.jsdelivr.net/npm/@webxr/webxr-polyfill@latest"></script>
 </head>
 <body>
   <div id="container"></div>
 
   <script>
-    let scene, camera, renderer;
-    let phoneModel, xrController;
-    
+    let scene, camera, renderer, phoneModel, xrController, hitTestSource = null;
+
     // Initialize 3D scene
     function init() {
       scene = new THREE.Scene();
@@ -33,28 +33,30 @@
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.getElementById("container").appendChild(renderer.domElement);
-      
+
       // Add a basic ambient light
       const light = new THREE.AmbientLight(0xffffff);
       scene.add(light);
-      
+
       // Add a phone model (a simple cube in this case)
-      const phoneGeometry = new THREE.BoxGeometry(1, 2, 0.1); // Width, height, depth of the phone
+      const phoneGeometry = new THREE.BoxGeometry(1, 2, 0.1);
       const phoneMaterial = new THREE.MeshBasicMaterial({ color: 0x4b8a3d });
       phoneModel = new THREE.Mesh(phoneGeometry, phoneMaterial);
-      phoneModel.position.set(0, 0, -5); // Position it in front of the camera
+      phoneModel.position.set(0, 0, -5);
       scene.add(phoneModel);
 
       // Add a simple 3D model (a rotating cube) to simulate an app on the phone
       const modelGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
       const modelMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       const model = new THREE.Mesh(modelGeometry, modelMaterial);
-      model.position.set(0, 0, -0.05); // Slightly above the phone's surface
+      model.position.set(0, 0, -0.05);
       phoneModel.add(model);
 
       // Start the WebXR session for AR (immersive AR)
       if (navigator.xr) {
-        navigator.xr.requestSession('immersive-ar').then(onSessionStarted);
+        navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test', 'anchors']
+        }).then(onSessionStarted);
       }
 
       animate();
@@ -63,14 +65,17 @@
     function onSessionStarted(session) {
       xrController = new THREE.XRControllerModelFactory();
       session.addEventListener('end', onSessionEnded);
-      
+
       // Create an XR WebGL layer for AR experience
       const xrLayer = new THREE.XRWebGLLayer(session, renderer.context);
       session.updateRenderState({ baseLayer: xrLayer });
-      
-      // Set the camera's projection matrix to match the XR session
-      const xrCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      scene.add(xrCamera);
+
+      // Set up hit testing for placing models on real-world surfaces
+      session.requestReferenceSpace('local').then((referenceSpace) => {
+        session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
     }
 
     function onSessionEnded() {
@@ -80,7 +85,19 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Rotate the phone and its 3D model for effect
+      // Perform hit testing every frame to detect surfaces and update the position of the phone model
+      if (hitTestSource) {
+        const hitTestResults = renderer.xr.getSession().hitTestResults;
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const hitPose = hit.getPose(new THREE.XRReferenceSpace());
+          if (hitPose) {
+            phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+          }
+        }
+      }
+
+      // Rotate the phone model and its app model (cube) for animation
       phoneModel.rotation.y += 0.01;
 
       renderer.render(scene, camera);
