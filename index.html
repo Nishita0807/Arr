@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebXR AR 3D Model on Real-World Surface</title>
- <link rel="icon" href="data:,">
+  <link rel="icon" href="data:,">
   <style>
     body, html {
       margin: 0;
@@ -77,7 +77,9 @@
         if (navigator.xr.isSessionSupported('immersive-ar')) {
           navigator.xr.requestSession('immersive-ar', {
             requiredFeatures: ['hit-test', 'anchors']
-          }).then(onSessionStarted);
+          }).then(onSessionStarted).catch((err) => {
+            console.log('Error starting AR session: ', err);
+          });
         } else {
           console.log("WebXR is not supported or immersive AR is not available.");
         }
