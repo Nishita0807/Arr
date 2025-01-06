@@ -39,19 +39,10 @@
       const light = new THREE.AmbientLight(0xffffff);
       scene.add(light);
 
-      // Add a phone model (a simple cube in this case)
-      const phoneGeometry = new THREE.BoxGeometry(1, 2, 0.1);
-      const phoneMaterial = new THREE.MeshBasicMaterial({ color: 0x4b8a3d });
-      phoneModel = new THREE.Mesh(phoneGeometry, phoneMaterial);
-      phoneModel.position.set(0, 0, -5);
-      scene.add(phoneModel);
-
       // Add a simple 3D model (a rotating cube) to simulate an app on the phone
       const modelGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
       const modelMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       const model = new THREE.Mesh(modelGeometry, modelMaterial);
-      model.position.set(0, 0, -0.05);
-      phoneModel.add(model);
 
       // Start the WebXR session for AR (immersive AR)
       if (navigator.xr) {
@@ -95,21 +86,26 @@
 
       // Perform hit testing every frame to detect surfaces and update the position of the phone model
       if (hitTestSource) {
-        // Perform hit testing to detect surfaces in the real world
-        const results = xrController.hitTestResults;
-        if (results.length > 0) {
-          const hit = results[0];
+        const session = renderer.xr.getSession();
+        const hitTestResults = session.hitTestResults;
+
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
           const hitPose = hit.getPose(new THREE.XRReferenceSpace());
+
           if (hitPose) {
-            // Update the model's position based on the hit test pose
-            phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+            // Update the position of the 3D model based on the hit test results
+            const model = new THREE.Mesh(
+              new THREE.BoxGeometry(0.4, 0.4, 0.4),
+              new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            );
+            model.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+            scene.add(model);
           }
         }
       }
 
-      // Rotate the phone model and its app model (cube) for animation
-      phoneModel.rotation.y += 0.01;
-
+      // Render the scene
       renderer.render(scene, camera);
     }
 
