@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebXR 3D Model on Phone Screen</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #f0f0f0;
+    }
+    #container {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@webxr/webxr-polyfill@latest"></script> <!-- WebXR Polyfill for browsers -->
+</head>
+<body>
+  <div id="container"></div>
+
+  <script>
+    let scene, camera, renderer;
+    let phoneModel, xrController;
+    
+    // Initialize 3D scene
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById("container").appendChild(renderer.domElement);
+      
+      // Add a basic ambient light
+      const light = new THREE.AmbientLight(0xffffff);
+      scene.add(light);
+      
+      // Add a phone model (a simple cube in this case)
+      const phoneGeometry = new THREE.BoxGeometry(1, 2, 0.1); // Width, height, depth of the phone
+      const phoneMaterial = new THREE.MeshBasicMaterial({ color: 0x4b8a3d });
+      phoneModel = new THREE.Mesh(phoneGeometry, phoneMaterial);
+      phoneModel.position.set(0, 0, -5); // Position it in front of the camera
+      scene.add(phoneModel);
+
+      // Add a simple 3D model (a rotating cube) to simulate an app on the phone
+      const modelGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+      const modelMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const model = new THREE.Mesh(modelGeometry, modelMaterial);
+      model.position.set(0, 0, -0.05); // Slightly above the phone's surface
+      phoneModel.add(model);
+
+      // Start the WebXR session for AR (immersive AR)
+      if (navigator.xr) {
+        navigator.xr.requestSession('immersive-ar').then(onSessionStarted);
+      }
+
+      animate();
+    }
+
+    function onSessionStarted(session) {
+      xrController = new THREE.XRControllerModelFactory();
+      session.addEventListener('end', onSessionEnded);
+      
+      // Create an XR WebGL layer for AR experience
+      const xrLayer = new THREE.XRWebGLLayer(session, renderer.context);
+      session.updateRenderState({ baseLayer: xrLayer });
+      
+      // Set the camera's projection matrix to match the XR session
+      const xrCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      scene.add(xrCamera);
+    }
+
+    function onSessionEnded() {
+      console.log('AR session ended');
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Rotate the phone and its 3D model for effect
+      phoneModel.rotation.y += 0.01;
+
+      renderer.render(scene, camera);
+    }
+
+    // Initialize everything when the window loads
+    window.onload = init;
+  </script>
+</body>
+</html>
