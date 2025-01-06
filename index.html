@@ -25,6 +25,7 @@
 
   <script>
     let scene, camera, renderer, phoneModel, xrController, hitTestSource = null;
+    let hitTestResults = [];
 
     // Initialize 3D scene
     function init() {
@@ -76,6 +77,13 @@
           hitTestSource = source;
         });
       });
+
+      // Set up hit test results query on the session
+      session.requestReferenceSpace('viewer').then((referenceSpace) => {
+        session.requestHitTestSourceForTransientInput({ space: referenceSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
     }
 
     function onSessionEnded() {
@@ -87,11 +95,13 @@
 
       // Perform hit testing every frame to detect surfaces and update the position of the phone model
       if (hitTestSource) {
-        const hitTestResults = renderer.xr.getSession().hitTestResults;
-        if (hitTestResults.length > 0) {
-          const hit = hitTestResults[0];
+        // Perform hit testing to detect surfaces in the real world
+        const results = xrController.hitTestResults;
+        if (results.length > 0) {
+          const hit = results[0];
           const hitPose = hit.getPose(new THREE.XRReferenceSpace());
           if (hitPose) {
+            // Update the model's position based on the hit test pose
             phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
           }
         }
