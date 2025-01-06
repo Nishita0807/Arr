@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebXR AR 3D Model on Real-World Surface</title>
-  <link rel="icon" href="data:,">
   <style>
     body, html {
       margin: 0;
@@ -27,6 +26,7 @@
       padding: 10px;
       border: none;
       cursor: pointer;
+      z-index: 10;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -39,6 +39,7 @@
   <script>
     let scene, camera, renderer, phoneModel, xrSession = null;
     let hitTestSource = null;
+    let hitTestSourceRequested = false;
 
     // Initialize 3D scene
     function init() {
@@ -59,13 +60,6 @@
       phoneModel.position.set(0, 0, -5);
       scene.add(phoneModel);
 
-      // Add a rotating cube inside the phone model to simulate an app
-      const modelGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-      const modelMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const model = new THREE.Mesh(modelGeometry, modelMaterial);
-      model.position.set(0, 0, -0.05);
-      phoneModel.add(model);
-
       // Set up the start button to begin the AR session
       document.getElementById("startButton").addEventListener("click", startARSession);
     }
@@ -79,7 +73,7 @@
         navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
           if (supported) {
             navigator.xr.requestSession('immersive-ar', {
-              requiredFeatures: ['hit-test', 'anchors']
+              requiredFeatures: ['hit-test', 'anchors'],
             }).then(onSessionStarted).catch((err) => {
               console.error('Error starting AR session: ', err);
             });
@@ -102,42 +96,46 @@
       const xrLayer = new THREE.XRWebGLLayer(session, renderer.context);
       session.updateRenderState({ baseLayer: xrLayer });
 
+      // Create reference space for hit testing
       session.requestReferenceSpace('local').then((referenceSpace) => {
         session.requestHitTestSource({ space: referenceSpace }).then((source) => {
           hitTestSource = source;
+          hitTestSourceRequested = true;
         });
       });
 
       // Listen for the session end
       session.addEventListener('end', onSessionEnded);
+
+      // Start the animation loop
+      session.requestAnimationFrame(onXRFrame);
     }
 
     function onSessionEnded() {
       console.log('AR session ended');
     }
 
-    function animate() {
-      requestAnimationFrame(animate);
+    // Handle the AR frame updates
+    function onXRFrame(t, frame) {
+      let session = frame.session;
 
-      // Perform hit testing and update the phone model's position
-      if (xrSession && hitTestSource) {
-        xrSession.requestHitTestSource({ space: xrSession.viewerSpace }).then((results) => {
-          if (results.length > 0) {
-            const hit = results[0];
-            const hitPose = hit.getPose(xrSession.localReferenceSpace);
-            if (hitPose) {
-              phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
-            }
+      // Get the hit test results
+      if (hitTestSourceRequested && hitTestSource) {
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const hitPose = hit.getPose(session.referenceSpace);
+
+          if (hitPose) {
+            phoneModel.position.set(hitPose.position.x, hitPose.position.y, hitPose.position.z);
+            phoneModel.rotation.set(hitPose.rotation.x, hitPose.rotation.y, hitPose.rotation.z);
           }
-        }).catch((err) => {
-          console.error("Error during hit test: ", err);
-        });
+        }
       }
 
-      // Rotate the phone model for animation
-      phoneModel.rotation.y += 0.01;
-
+      // Render the scene
       renderer.render(scene, camera);
+      session.requestAnimationFrame(onXRFrame);
     }
 
     window.onload = init;
